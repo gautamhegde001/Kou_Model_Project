@@ -1,11 +1,17 @@
 import numpy as np
-from .carr_madan_function_aux import carr_madan_function
+from .carr_madan_function_aux import carr_madan_function, carr_madan_function_vectorized
+from scipy.interpolate import RegularGridInterpolator
 
 import logging
 
 import numpy as np
 
-def price_options_fft(S_0 : np.float64, T : np.float64, kou_params : dict, N=8192*4, d_v=0.01, alpha=0.75):
+"""This file contains a function to calculate price options for a fixed grid of strike prices, for a given S_0,T. Useful for proof of principle. 
+This function cannot be used to compute price options for an arbitrary strike price.
+"""
+
+
+def price_options_fft(S_0 : np.float64, T : np.float64, kou_params : dict, N=8192, d_v=0.01, alpha=0.75):
     """
     S_0 : Spot price, (stock value at initial time)
 
@@ -57,4 +63,6 @@ def price_options_fft(S_0 : np.float64, T : np.float64, kou_params : dict, N=819
     mask = (x_grid > -0.7) & (x_grid < 0.7)
     
     return strikes[mask], call_prices[mask]
+
+
 

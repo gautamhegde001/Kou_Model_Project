@@ -112,3 +112,42 @@ def carr_madan_function(v : np.float64, alpha : np.float64, T : np.float64, kou_
     Denominator = alpha**2 + alpha - v**2 + 1j*(2*alpha + 1)*v
 
     return Numerator/Denominator
+
+def carr_madan_function_vectorized(v_array : np.ndarray, alpha : np.float64, T_array : np.ndarray, kou_params : dict) -> np.ndarray :
+    """
+    v_array : 1D Array of v (length N), where v is the argument of carr-madan function
+
+    alpha : Damping factor used to make function square integrable, and hence amenable to fourier transforms
+
+    T_array : 1D Array of expiry times T (length M)
+
+    kou_params : A dictionary containing all the parameters characterizing the kou process. 
+
+    Returns :
+        CM_func_array : 2D array of size (M,N)
+            The carr_madan function evaluated at the values of v, T in v_array and T_array respectively. 
+            Rows correspond to expiry times T
+            Columns correspond to frequency v 
+
+    The carr-madan function is a useful function that can be used to calculate the option prices numerically in a feasible manner.
+    It is defined as the fourier transform of the call price multiplied by a damping exponential factor e^{alpha k}
+    """
+    v_array = np.atleast_1d(v_array) #Forces the array to be atleast 1D incase someone passes just 1 frequency. This is a row vector containing v's. 
+    T_array = np.atleast_1d(T_array) # Ensure T_array is a numpy array
+    T_col_array = T_array[:,None]
+
+
+
+    z_array = v_array - (alpha+1)*1j
+    phi = characteristic_function(z_array,T_col_array,kou_params) # 2D array (matrix) of size M x N
+
+    r = kou_params['r']
+
+    
+    Numerator = np.exp(-r*T_col_array)*phi # 2D array (matrix) of size M x N
+
+    Denominator = alpha**2 + alpha - v_array**2 + 1j*(2*alpha + 1)*v_array # 1d array (row vector) of size N
+
+    CM_func_array = Numerator/Denominator #Broadcasting works because N_cols(Numerator)  = N_cols(denominator) = N, N_rows(denominator) = 1 
+
+    return CM_func_array
