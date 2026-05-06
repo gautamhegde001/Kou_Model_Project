@@ -3,7 +3,7 @@
 This repository contains Python tools for pricing options under the **Kou Jump Diffusion Model** and simulating portfolio delta hedging. It provides implementations using multiple quantitative finance methodologies.
 
 ## Valuation Methods & Features Implemented
-1. **Model Calibration**: Includes a module to calibrate the Kou model parameters to real or simulated market data.
+1. **Model Calibration**: Includes a module to calibrate the Kou model parameters to real or simulated market data. Real market data is taken using yfinance, with data-cleaning done using SQL. 
 2. **Inverse Fast Fourier Transform (FFT)**: Prices options efficiently based on the characteristic function of the Kou model using the Carr and Madan (1999) approach. The theory behind this is explained in the Project_Report.pdf file. 
 3. **Vectorized Pricing for Arbitrary Strikes**: Option prices for several options can be calculated simultaneously in a vectorized way allowing arbitrary strikes, rather than being restricted to a predetermined standard FFT grid.
 4. **Monte Carlo Simulations**: Computes the option prices by generating simulated stock paths with Brownian motion and Poisson-driven exponential jumps.
@@ -59,4 +59,5 @@ This project is built utilizing the scientific computing libraries, and the yfin
 - matplotlib
 - pandas
 - yfinance
+- sqlalchemy
 
