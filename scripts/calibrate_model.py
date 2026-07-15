@@ -39,7 +39,7 @@ def main(ticker_symbol : str, r : np.float64 ) :
 
 if __name__ == "__main__" :
     start = time.perf_counter()
-    ticker_symbol = "SPY"
+    ticker_symbol = "AAPL"
     r = 0.05
     main(ticker_symbol,r)
     end = time.perf_counter()

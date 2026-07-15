@@ -1,0 +1,5 @@
+{
+  "cmake.configureArgs": [
+    "-Dpybind11_DIR=C:/Users/power/OneDrive/Documents/Academic/Erdos/Quant Finance/Kou_Model_Project/kou/lib/site-packages/pybind11/share/cmake/pybind11"
+  ]
+}

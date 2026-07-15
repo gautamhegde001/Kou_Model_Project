@@ -1,8 +1,16 @@
 import numpy as np
 from pathlib import Path
 import logging
+import time
 
 from pkgs.Option_pricing_and_deltas.price_options_via_fft import price_options_fft
+
+def format_time(seconds):
+    """Convert seconds (float) → h, m, s.ssssss"""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = seconds % 60      # keep fractional part
+    return f"{h} hours {m} minutes {s:.6f} seconds"
 
 def main(S_0 : np.float64,T : np.float64, kou_params : dict)  :
     """
@@ -52,9 +60,13 @@ if __name__ == "__main__" : # This ensures that the main function is run only if
 
     print("Calc price options via fft")
 
+    start = time.perf_counter()
+
     main(S_0, T, kou_params)
 
-    print("Done calculating price options via fft")
+    end = time.perf_counter()
+
+    print("Done calculating price options via fft in ",format_time(end-start))
 
 
 

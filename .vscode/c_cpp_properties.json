@@ -1,0 +1,25 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Users/power/OneDrive/Documents/Academic/Erdos/Quant Finance/Kou_Model_Project/kou/lib/site-packages/pybind11/include",
+                "C:/Users/power/anaconda3/Include",
+                "C:/Users/power/OneDrive/Documents/Academic/Erdos/Quant Finance/Kou_Model_Project/kou/lib/site-packages/numpy/_core/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.26100.0",
+            "compilerPath": "cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}

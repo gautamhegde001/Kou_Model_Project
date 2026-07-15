@@ -2,8 +2,16 @@ import numpy as np
 from pathlib import Path
 import pandas as pd
 import logging
+import time
 
 from pkgs.Option_pricing_and_deltas.pricer_arbitrary_strikes import KouPricer
+
+def format_time(seconds):
+    """Convert seconds (float) → h, m, s.ssssss"""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = seconds % 60      # keep fractional part
+    return f"{h} hours {m} minutes {s:.6f} seconds"
 
 def main(S_0_array : np.ndarray, K_array : np.ndarray , T_array : np.ndarray, kou_params : dict)  :
     """
@@ -64,9 +72,13 @@ if __name__ == "__main__" : # This ensures that the main function is run only if
 
     print("Calc price options via fft")
 
+    start = time.perf_counter()
+
     main(S_0_array, K_array, T_array, kou_params)
 
-    print("Done calculating price options via fft")
+    end = time.perf_counter()
+
+    print("Done calculating price options via fft in ",format_time(end-start))
 
 
 

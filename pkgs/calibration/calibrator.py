@@ -266,7 +266,7 @@ class calibrator():
             x0=initial_guess,
             method='L-BFGS-B',
             bounds=bounds,
-            options={'disp': True, 'ftol': 1e-6}
+            options={'disp': True, 'ftol': 1e-4}
         )
 
         print("Optimized Parameters:", result.x)
