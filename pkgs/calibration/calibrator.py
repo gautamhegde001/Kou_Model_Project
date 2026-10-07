@@ -245,6 +245,10 @@ class calibrator():
         spread_floor = 0.05
         mse = np.mean( ((calculated_prices - self.market_prices) / np.maximum(self.market_spreads, spread_floor))**2 )
 
+        #---- NaN/inf prices don't raise an exception, so penalize them here too----------#
+        if not np.isfinite(mse):
+            return 1e6
+
         return mse
     
     def calibrate(self, initial_guess: list):
@@ -255,19 +259,28 @@ class calibrator():
             (0.04, 2.0),   # sigma
             (1e-4, 10.0),  # lambda
             (0.0, 1.0),    # p
-            (1.01, 50.0),  # eta1
+            (2.0, 50.0),   # eta1 : Carr-Madan with alpha=0.75 needs E[S_T^(1+alpha)] finite, i.e. eta1 > 1.75
             (1e-4, 50.0)   # eta2
         )
+
+        #---- Optimize over parameters rescaled to [0,1]. The raw parameters differ in scale by ~50x (p vs eta), and the objective has a narrow curved
+        #---- valley along the jump parameters. Without rescaling, the finite-difference gradients make L-BFGS-B stall far from the minimum.
+        lower = np.array([b[0] for b in bounds])
+        upper = np.array([b[1] for b in bounds])
+        to_params = lambda u : lower + u*(upper - lower)
+        scaled_objective = lambda u : self.objective_function(list(to_params(u)))
+        scaled_guess = (np.array(initial_guess) - lower)/(upper - lower)
 
         print("Starting optimization... this may take a few minutes.")
 
         result = minimize(
-            fun=self.objective_function, 
-            x0=initial_guess,
+            fun=scaled_objective,
+            x0=scaled_guess,
             method='L-BFGS-B',
-            bounds=bounds,
-            options={'disp': True, 'ftol': 1e-4}
+            bounds=[(0.0, 1.0)]*len(bounds),
+            options={'disp': True, 'ftol': 1e-12, 'gtol': 1e-10} # objective is flat along the jump parameters, a loose ftol stops early
         )
 
-        print("Optimized Parameters:", result.x)
-        return result.x
+        parameters = to_params(result.x)
+        print("Optimized Parameters:", parameters)
+        return parameters
