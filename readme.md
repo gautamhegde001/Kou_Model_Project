@@ -6,7 +6,7 @@ This repository contains tools for pricing options under the **Kou Jump Diffusio
 1. **Model Calibration**: Includes a module to calibrate the Kou model parameters to real or simulated market data. Real market data is taken using yfinance, with data-cleaning done using SQL.
 2. **Inverse Fast Fourier Transform (FFT)**: Prices options efficiently based on the characteristic function of the Kou model using the Carr and Madan (1999) approach. The theory behind this is explained in the Project_Report.pdf file.
 3. **Vectorized Pricing for Arbitrary Strikes**: Option prices for several options can be calculated simultaneously in a vectorized way allowing arbitrary strikes, rather than being restricted to a predetermined standard FFT grid.
-4. **Monte Carlo Simulations**: Computes option prices by generating simulated stock paths with Brownian motion and Poisson-driven double-exponential jumps. Available with two interchangeable backends: a vectorized NumPy implementation and a C++ engine (via pybind11) that parallelizes the path simulation with OpenMP, giving roughly a 100x speedup. The C++ pricer is cross-validated against the semi-analytic Carr-Madan FFT pricer for correctness.
+4. **Monte Carlo Simulations**: Computes option prices by generating simulated stock paths with Brownian motion and Poisson-driven double-exponential jumps. Available with two interchangeable backends: a vectorized NumPy implementation and a C++ engine (via pybind11) that parallelizes the path simulation with OpenMP, giving roughly a 200x speedup. The C++ pricer is cross-validated against the semi-analytic Carr-Madan FFT pricer for correctness.
 5. **Delta Hedging Simulation**: Simulates the performance of a delta-hedged portfolio through time.
 
 ## Project Structure

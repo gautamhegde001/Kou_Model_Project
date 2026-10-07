@@ -1,5 +1,6 @@
 import numpy as np
 from pkgs.Option_pricing_and_deltas.delta_calculator import delta_interpolator_maker
+from pkgs.Option_pricing_and_deltas.pricer_arbitrary_strikes import KouPricer
 
 def monte_carlo(n_sims : int, n_steps: int, S_0 : np.float64, T : np.float64, kou_params : dict) :
     """
@@ -174,7 +175,7 @@ def monte_carlo_hedging(n_sims : int, n_steps: int, S_0 : np.float64, K : np.flo
         """
         
 
-        log_moneyness_array = np.log(S_array/K)
+        log_moneyness_array = np.log(K/S_array)
 
         query_points = np.c_[np.full_like(log_moneyness_array, tau), log_moneyness_array]
 
@@ -207,7 +208,11 @@ def monte_carlo_hedging(n_sims : int, n_steps: int, S_0 : np.float64, K : np.flo
     #  The Call Option Payoff at expiry
     option_payoff = np.maximum(S_final - K, 0)
     
-    #  The Portfolio Value at T (Payoff minus the trading gains)
-    portfolio_value_T = option_payoff - trading_pnl
+    #  The premium paid for the option at t=0 (Kou price), financed at the risk-free rate until T
+    option_price_0 = KouPricer(kou_params).generate_prices(S_0, K, T)[0]
+    premium_cost_T = option_price_0 * np.exp(r * T)
+
+    #  The Portfolio Value at T (Payoff minus the trading gains, minus the cost of buying the option)
+    portfolio_value_T = option_payoff - trading_pnl - premium_cost_T
 
     return portfolio_value_T

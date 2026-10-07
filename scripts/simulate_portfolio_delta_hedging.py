@@ -1,8 +1,16 @@
 import numpy as np
 from pathlib import Path
 import logging
+import time
 
 from pkgs.monte_carlo_simulators import monte_carlo_hedging
+
+def format_time(seconds):
+    """Convert seconds (float) → h, m, s.ssssss"""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = seconds % 60      # keep fractional part
+    return f"{h} hours {m} minutes {s:.6f} seconds"
 
 
 def main(S_0 : np.float64, K: np.float64, T : np.float64, n_sims : int, n_steps : int, kou_params : dict)  :
@@ -17,7 +25,7 @@ def main(S_0 : np.float64, K: np.float64, T : np.float64, n_sims : int, n_steps 
     Given a specific S_0 and T, computes price options for a range of different strike prices by running monte carlo simulations and computing the mean
 
     """
-
+    start = time.perf_counter()
     simulated_PnL = monte_carlo_hedging(n_sims,n_steps,S_0,K,T,kou_params)
 
 
@@ -33,6 +41,8 @@ def main(S_0 : np.float64, K: np.float64, T : np.float64, n_sims : int, n_steps 
 
     np.save(output_path,simulated_PnL)
 
+    end = time.perf_counter()
+    print("Time taken to run is ",format_time(end-start))
 if __name__ == "__main__" : # This ensures that the main function is run only if this script is being run
 
     S_0 = 100.0
@@ -48,7 +58,7 @@ if __name__ == "__main__" : # This ensures that the main function is run only if
     # ---------- Choosing kou parameters ------------------
     r = 0.05
     sigma = 0.15
-    lam = 6.0
+    lam = 0.0
     p = 0.3
     eta1 = 25.0
     eta2 = 10.0
