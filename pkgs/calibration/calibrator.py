@@ -3,6 +3,7 @@ import pandas as pd
 import yfinance as yf
 from scipy.optimize import minimize
 from ..Option_pricing_and_deltas.pricer_arbitrary_strikes import KouPricer
+from .validation import implied_volatility, bs_call_price
 from datetime import datetime
 from sqlalchemy import create_engine
 from scipy.stats import norm
@@ -56,7 +57,10 @@ class calibrator():
         self.K_array = None
         self.market_prices = None
 
-    def fetch_and_clean_data_SQL(self) : 
+        # Held out (test) data, set by split_by_expiry(). None means all the data is used for calibration
+        self.test_data = None
+
+    def fetch_and_clean_data_SQL(self) :
         """
         Pull option chains from Yfinance, loads data into an in-memory SQL database, 
         cleans it using SQL queries (faster than cleaning it using pandas), and prepared calibration arrays
@@ -211,7 +215,93 @@ class calibrator():
         
 
         print(f"Successfully loaded {len(self.market_prices)} liquid call options.")
-    
+
+    def split_by_expiry(self, test_every: int = 5, first_test: int = 2):
+        """
+        test_every : Every test_every-th expiry (sorted by maturity) is held out
+
+        first_test : Index of the first held out expiry. Must be >= 1 so the shortest expiry stays in the training set
+
+        Splits the data by whole expiries : all the options of the held out expiries form the test set, and the rest are used for calibration.
+        The shortest and longest expiries are always kept for calibration, so the model is tested on maturities lying between the ones it was
+        calibrated on (interpolation in T, not extrapolation). After this call, calibrate() only uses the training expiries, and evaluate()
+        prices the test expiries.
+        """
+        if self.market_prices is None:
+            self.fetch_and_clean_data_SQL()
+
+        if self.test_data is not None:
+            raise RuntimeError("Data has already been split. Create a new calibrator to split again.")
+
+        if first_test < 1:
+            raise ValueError("first_test must be >= 1 so that the shortest expiry is used for calibration.")
+
+        #------Every test_every-th expiry, starting at first_test, never the last one------#
+        unique_T = np.unique(self.T_array)
+        test_T = unique_T[first_test:-1:test_every]
+        test_mask = np.isin(self.T_array, test_T)
+
+        #------Move the held out options from the calibration arrays to self.test_data------#
+        array_names = ['S0_array', 'K_array', 'T_array', 'market_prices', 'market_ivs', 'market_vegas', 'market_spreads']
+        self.test_data = {}
+        for name in array_names:
+            full_array = getattr(self, name)
+            self.test_data[name] = full_array[test_mask]
+            setattr(self, name, full_array[~test_mask])
+
+        print(f"Calibrating on {len(unique_T) - len(test_T)} expiries ({len(self.market_prices)} options). "
+              f"Holding out {len(test_T)} expiries ({test_mask.sum()} options) : {', '.join(f'{T*365:.0f}' for T in test_T)} days.")
+
+    def evaluate(self, parameters: list) -> pd.DataFrame:
+        """
+        parameters : Calibrated parameters [sigma, lam, p, eta1, eta2], e.g. returned by calibrate()
+
+        Returns :
+            results : pd.DataFrame
+                One row per held out option, with columns T, K, log_moneyness, market_price, model_price, market_iv, model_iv.
+                Implied volatilities are obtained by inverting Black-Scholes, using the same r for the market mid prices and the model prices.
+                NaN where a price is outside the no-arbitrage bounds (e.g. deep in the money calls quoted below intrinsic value).
+
+        Uses the calibrated parameters to predict the prices of the options of the held out expiries (see split_by_expiry())
+        """
+        if self.test_data is None:
+            raise RuntimeError("No held out data. Call split_by_expiry() before calibrate() and evaluate().")
+
+        kou_params = {
+            'r' : self.risk_free_interest,
+            'sigma' : parameters[0],
+            'lam': parameters[1],
+            'p': parameters[2],
+            'eta1': parameters[3],
+            'eta2': parameters[4]
+        }
+
+        S0 = self.test_data['S0_array']
+        K = self.test_data['K_array']
+        T = self.test_data['T_array']
+        market_prices = self.test_data['market_prices']
+
+        #------Black-Scholes (lam = 0) : the implied volatility is sigma at every strike by definition. Inverting the price instead would give NaN
+        #------wherever the price has no time value left (far from the money at short maturities), cutting the predicted curve short------#
+        if kou_params['lam'] == 0:
+            model_prices = bs_call_price(S0, K, T, self.risk_free_interest, np.full(len(K), kou_params['sigma']))
+            model_ivs = np.full(len(K), kou_params['sigma'])
+        else:
+            model_prices = KouPricer(kou_params).generate_prices(S0, K, T)
+            model_ivs = implied_volatility(model_prices, S0, K, T, self.risk_free_interest)
+
+        results = pd.DataFrame({
+            'T' : T,
+            'K' : K,
+            'log_moneyness' : np.log(K / S0),
+            'market_price' : market_prices,
+            'model_price' : model_prices,
+            'market_iv' : implied_volatility(market_prices, S0, K, T, self.risk_free_interest),
+            'model_iv' : model_ivs
+        })
+
+        return results
+
     def objective_function(self, params_list: list) -> float:
         """
         params_list : List containing the kou parameters defining a process. 
@@ -251,7 +341,17 @@ class calibrator():
 
         return mse
     
-    def calibrate(self, initial_guess: list):
+    def calibrate(self, initial_guess: list, fix_lam_zero: bool = False):
+        """
+        initial_guess : List [sigma, lam, p, eta1, eta2] used as the starting point of the optimizer
+
+        fix_lam_zero : If True, lam is fixed to 0 (no jumps) and only sigma is calibrated, i.e. the model is calibrated as Black-Scholes.
+                       p, eta1, eta2 have no effect on prices when lam = 0, so they are held at their values in initial_guess.
+
+        Returns :
+            parameters : np.ndarray
+                Calibrated [sigma, lam, p, eta1, eta2]
+        """
         if self.market_prices is None:
             self.fetch_and_clean_data_SQL()
         
@@ -267,9 +367,23 @@ class calibrator():
         #---- valley along the jump parameters. Without rescaling, the finite-difference gradients make L-BFGS-B stall far from the minimum.
         lower = np.array([b[0] for b in bounds])
         upper = np.array([b[1] for b in bounds])
-        to_params = lambda u : lower + u*(upper - lower)
+
+        #---- Parameters that are not free are held at their value in fixed_params. Black-Scholes : only sigma is free, lam = 0-------#
+        fixed_params = np.array(initial_guess, dtype=float)
+        free = np.ones(len(bounds), dtype=bool)
+        if fix_lam_zero:
+            fixed_params[1] = 0.0
+            free[:] = False
+            free[0] = True
+            print("lam fixed to 0 : calibrating Black-Scholes (sigma only).")
+
+        def to_params(u):
+            params = fixed_params.copy()
+            params[free] = lower[free] + u*(upper[free] - lower[free])
+            return params
+
         scaled_objective = lambda u : self.objective_function(list(to_params(u)))
-        scaled_guess = (np.array(initial_guess) - lower)/(upper - lower)
+        scaled_guess = (fixed_params[free] - lower[free])/(upper[free] - lower[free])
 
         print("Starting optimization... this may take a few minutes.")
 
@@ -277,7 +391,7 @@ class calibrator():
             fun=scaled_objective,
             x0=scaled_guess,
             method='L-BFGS-B',
-            bounds=[(0.0, 1.0)]*len(bounds),
+            bounds=[(0.0, 1.0)]*int(free.sum()),
             options={'disp': True, 'ftol': 1e-12, 'gtol': 1e-10} # objective is flat along the jump parameters, a loose ftol stops early
         )
 
